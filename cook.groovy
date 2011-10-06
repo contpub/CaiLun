@@ -95,5 +95,18 @@ class RepoCook {
 	}
 }
 
-new RepoCook().receive()
+
+def config
+def confFile = new File('cook.properties')
+def confSecureFile = new File('cook-secure.properties')
+
+if (confSecureFile.exists()) {
+	config = new ConfigSlurper().parse(confSecureFile.toURL())
+}
+else if (confFile.exists()) {
+	config = new ConfigSlurper().parse(confFile.toURL())
+}
+
+println config
+//new RepoCook().receive()
 
