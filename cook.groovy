@@ -1,9 +1,11 @@
+#!/usr/bin/groovy
 @Grab('com.rabbitmq:amqp-client:2.6.1')
 @Grab('net.java.dev.jets3t:jets3t:0.8.1')
 
 import groovy.json.*
 import com.rabbitmq.client.*
 import org.jets3t.service.*
+import org.jets3t.service.model.S3Object
 import org.jets3t.service.security.AWSCredentials
 import org.jets3t.service.impl.rest.httpclient.RestS3Service
 
@@ -118,19 +120,26 @@ class RepoCook {
 		println "pdf file: ${pathOfPdf}"
 		println "epub file: ${pathOfEpub}"
 		
+		def object
+		
+		object = new S3Object("${name}.pdf", pathOfPdf.bytes)
+		object = s3Service.putObject(bucket, object)
+		
+		object = new S3Object("${name}.epub", pathOfEpub.bytes)
+		object = s3Service.putObject(bucket, object)
+		
+		println object
+		
+		/*
 		cmd = "s3cmd put -P ${pathOfPdf} s3://contpub/cache/${name}.pdf"
 		proc = cmd.execute()
 		proc.waitFor()
 		println proc.in.text
-		
-		cmd = "s3cmd put -P ${pathOfEpub} s3://contpub/cache/${name}.epub"
-		proc = cmd.execute()
-		proc.waitFor()
-		println proc.in.text
+		*/
 		
 		[
-			pdf: "http://contpub.s3.amazonaws.com/cache/${name}.pdf",
-			epub: "http://contpub.s3.amazonaws.com/cache/${name}.epub"
+			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
+			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
 		]
 	}
 }
@@ -160,6 +169,6 @@ cook.connect2aws()
 //println cook.bucket
 //println cook.s3Service.listObjects(cook.bucket)
 
-//cook.receive()
+cook.receive()
 cook.disconnect2rabbitmq()
 
