@@ -35,10 +35,12 @@ class RepoCook {
 	 */
 	def connect2rabbitmq() {
 		def factory = new ConnectionFactory()
+
 		factory.host = rabbitmq.hostname
 		factory.port = rabbitmq.port
 		factory.username = rabbitmq.username
 		factory.password = rabbitmq.password
+
 		connection = factory.newConnection()
 		channel = connection.createChannel()
 		
@@ -71,7 +73,8 @@ class RepoCook {
 		def slurper = new JsonSlurper()
 		
 		while (true) {
-			println "Receiving ..."
+			println " [o] Receiving ..."
+
 			def delivery = consumer.nextDelivery()
 			def message = new String(delivery.body)
 			println(" [x] Received '$message'")
@@ -102,47 +105,56 @@ class RepoCook {
 		}
 	}
 	
+	def upload(key, bytes) {
+		println "upload"
+		
+		// reconnect to aws for prevent timeout
+		cook.connect2aws()
+		
+		def object //S3Object
+		
+		object = new S3Object(key, bytes)
+		object = s3Service.putObject(bucket, object)
+	}
+	
+	def lookupFile(path, pattern) {
+		def result
+		new File(path).eachFileMatch(pattern) {
+			f ->
+			result = f
+		}
+		result
+	}
+	
+	def runCmd(cmd) {
+		def proc = cmd.execute()
+		proc.waitFor()
+		//println proc.in.text
+	}
+	
 	def cookEMBED(name, contents) {
 		
 		def pathToDir = new File("cache/${name}")
 		pathToDir.mkdirs()
+
 		def pathToIndex = new File("index.rst", pathToDir)
 		pathToIndex.write(contents, 'UTF-8')
 		
 		println "Cooking '${name}', '${pathToDir}' ..."
 		
-		def cmd = "sphinx-cook cache/${name}"
-		def proc = cmd.execute()
-		proc.waitFor()
-		println proc.in.text
+		runCmd("sphinx-cook cache/${name}")
+				
+		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
+		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
 		
-		
-		def pathOfPdf = null
-		def pathOfEpub = null
-		
-		new File("cache/${name}/cook").eachFileMatch(~/.*\.pdf/) {
-			f ->
-			pathOfPdf = f
-		}
-		
-		new File("cache/${name}/cook").eachFileMatch(~/.*\.epub/) {
-			f ->
-			pathOfEpub = f
-		}
-		
-		println "pdf file: ${pathOfPdf}"
-		println "epub file: ${pathOfEpub}"
+		//println "pdf file: ${pathOfPdf}"
+		//println "epub file: ${pathOfEpub}"
 		
 		def object
 		
-		object = new S3Object("${name}.pdf", pathOfPdf.bytes)
-		object = s3Service.putObject(bucket, object)
-		
-		object = new S3Object("${name}.epub", pathOfEpub.bytes)
-		object = s3Service.putObject(bucket, object)
-		
-		println object
-		
+		upload("${name}.pdf", pathOfPdf.bytes)
+		upload("${name}.epub", pathOfEpub.bytes)
+				
 		[
 			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
 			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
@@ -152,42 +164,20 @@ class RepoCook {
 	def cookGIT(name, url) {
 		println "Cooking '${name}', '${url}' ..."
 		
-		def cmd = "git clone ${url} cache/${name}"
-		def proc = cmd.execute()
-		proc.waitFor()
-		println proc.in.text
+		runCmd("git clone ${url} cache/${name}")		
+		runCmd("sphinx-cook cache/${name}")
 		
-		cmd = "sphinx-cook cache/${name}"
-		proc = cmd.execute()
-		proc.waitFor()
-		println proc.in.text
+		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
+		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
 		
-		def pathOfPdf = null
-		def pathOfEpub = null
-		
-		new File("cache/${name}/cook").eachFileMatch(~/.*\.pdf/) {
-			f ->
-			pathOfPdf = f
-		}
-		
-		new File("cache/${name}/cook").eachFileMatch(~/.*\.epub/) {
-			f ->
-			pathOfEpub = f
-		}
-		
-		println "pdf file: ${pathOfPdf}"
-		println "epub file: ${pathOfEpub}"
+		//println "pdf file: ${pathOfPdf}"
+		//println "epub file: ${pathOfEpub}"
 		
 		def object
 		
-		object = new S3Object("${name}.pdf", pathOfPdf.bytes)
-		object = s3Service.putObject(bucket, object)
-		
-		object = new S3Object("${name}.epub", pathOfEpub.bytes)
-		object = s3Service.putObject(bucket, object)
-		
-		println object
-		
+		upload("${name}.pdf", pathOfPdf.bytes)
+		upload("${name}.epub", pathOfEpub.bytes)
+
 		[
 			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
 			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
@@ -214,12 +204,18 @@ cook.aws = config.aws
 
 //println cook
 
-cook.connect2rabbitmq()
-cook.connect2aws()
-
-//println cook.bucket
-//println cook.s3Service.listObjects(cook.bucket)
-
-cook.receive()
-cook.disconnect2rabbitmq()
-
+try {
+	cook.connect2rabbitmq()
+	//cook.connect2aws()
+	
+	//println cook.bucket
+	//println cook.s3Service.listObjects(cook.bucket)
+	
+	cook.receive()
+	
+	// end
+	cook.disconnect2rabbitmq()
+}
+catch (ConnectException ex) {
+	println "Error: ${ex.message}"
+}
