@@ -79,12 +79,21 @@ class RepoCook {
 			def msg = slurper.parseText(message)
 			
 			if (msg.version && msg.version <= version) {
-				if (msg.type.equals('GIT')) {
-					def result = cookGIT(msg.name, msg.url)
-					
+				def result = null
+				
+				switch (msg?.type) {
+					case 'GIT':
+						result = cookGIT(msg.name, msg.url)
+					break;
+					case 'EMBED':
+						result = cookEMBED(msg.name, msg.contents)
+					break;
+				}
+				
+				if (result) {
 					def json = new JsonBuilder()
 					json id: msg.id, pdf: result.pdf, epub: result.epub
-					
+			
 					//Sending
 					channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
 					println(" [x] Sent '${json}'")
@@ -93,12 +102,61 @@ class RepoCook {
 		}
 	}
 	
+	def cookEMBED(name, contents) {
+		
+		def pathToDir = new File("cache/${name}")
+		pathToDir.mkdirs()
+		def pathToIndex = new File("index.rst", pathToDir)
+		pathToIndex.write(contents, 'UTF-8')
+		
+		println "Cooking '${name}', '${pathToDir}' ..."
+		
+		def cmd = "sphinx-cook cache/${name}"
+		def proc = cmd.execute()
+		proc.waitFor()
+		println proc.in.text
+		
+		
+		def pathOfPdf = null
+		def pathOfEpub = null
+		
+		new File("cache/${name}/cook").eachFileMatch(~/.*\.pdf/) {
+			f ->
+			pathOfPdf = f
+		}
+		
+		new File("cache/${name}/cook").eachFileMatch(~/.*\.epub/) {
+			f ->
+			pathOfEpub = f
+		}
+		
+		println "pdf file: ${pathOfPdf}"
+		println "epub file: ${pathOfEpub}"
+		
+		def object
+		
+		object = new S3Object("${name}.pdf", pathOfPdf.bytes)
+		object = s3Service.putObject(bucket, object)
+		
+		object = new S3Object("${name}.epub", pathOfEpub.bytes)
+		object = s3Service.putObject(bucket, object)
+		
+		println object
+		
+		[
+			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
+			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
+		]
+	}
+	
 	def cookGIT(name, url) {
 		println "Cooking '${name}', '${url}' ..."
+		
 		def cmd = "git clone ${url} cache/${name}"
 		def proc = cmd.execute()
 		proc.waitFor()
 		println proc.in.text
+		
 		cmd = "sphinx-cook cache/${name}"
 		proc = cmd.execute()
 		proc.waitFor()
