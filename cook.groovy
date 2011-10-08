@@ -188,13 +188,6 @@ class RepoCook {
 		
 		println object
 		
-		/*
-		cmd = "s3cmd put -P ${pathOfPdf} s3://contpub/cache/${name}.pdf"
-		proc = cmd.execute()
-		proc.waitFor()
-		println proc.in.text
-		*/
-		
 		[
 			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
 			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
