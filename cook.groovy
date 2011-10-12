@@ -89,7 +89,7 @@ class RepoCook {
 						result = cookGIT(msg.name, msg.url)
 					break;
 					case 'EMBED':
-						result = cookEMBED(msg.name, msg.contents)
+						result = cookEMBED(msg.name, msg.embed)
 					break;
 				}
 				
@@ -109,7 +109,7 @@ class RepoCook {
 		println "upload"
 		
 		// reconnect to aws for prevent timeout
-		cook.connect2aws()
+		connect2aws()
 		
 		def object //S3Object
 		
@@ -132,13 +132,13 @@ class RepoCook {
 		//println proc.in.text
 	}
 	
-	def cookEMBED(name, contents) {
+	def cookEMBED(name, embed) {
 		
 		def pathToDir = new File("cache/${name}")
 		pathToDir.mkdirs()
 
-		def pathToIndex = new File("index.rst", pathToDir)
-		pathToIndex.write(contents, 'UTF-8')
+		def pathToIndex = new File('index.rst', pathToDir)
+		pathToIndex.write(new URL(embed).text, 'UTF-8')
 		
 		println "Cooking '${name}', '${pathToDir}' ..."
 		
