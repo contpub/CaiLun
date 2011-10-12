@@ -138,7 +138,10 @@ class RepoCook {
 		pathToDir.mkdirs()
 
 		def pathToIndex = new File('index.rst', pathToDir)
-		pathToIndex.write(new URL(embed).text, 'UTF-8')
+		pathToIndex.write(new URL(embed+'?index').text, 'UTF-8')
+		
+		def pathToContents = new File('contents.rst', pathToDir)
+		pathToContents.write(new URL(embed).text, 'UTF-8')
 		
 		println "Cooking '${name}', '${pathToDir}' ..."
 		
