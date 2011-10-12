@@ -109,7 +109,7 @@ class RepoCook {
 		println "upload"
 		
 		// reconnect to aws for prevent timeout
-		cook.connect2aws()
+		connect2aws()
 		
 		def object //S3Object
 		
