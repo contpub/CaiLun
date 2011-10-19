@@ -89,7 +89,7 @@ class RepoCook {
 						result = cookGIT(msg.name, msg.url)
 					break;
 					case 'EMBED':
-						result = cookEMBED(msg.name, msg.embed)
+						result = cookEMBED(msg.name, msg.url)
 					break;
 				}
 				
@@ -132,16 +132,16 @@ class RepoCook {
 		//println proc.in.text
 	}
 	
-	def cookEMBED(name, embed) {
+	def cookEMBED(name, url) {
 		
 		def pathToDir = new File("cache/${name}")
 		pathToDir.mkdirs()
 
 		def pathToIndex = new File('index.rst', pathToDir)
-		pathToIndex.write(new URL(embed+'?index').text, 'UTF-8')
+		pathToIndex.write(new URL(url+'?index').text, 'UTF-8')
 		
 		def pathToContents = new File('contents.rst', pathToDir)
-		pathToContents.write(new URL(embed).text, 'UTF-8')
+		pathToContents.write(new URL(url).text, 'UTF-8')
 		
 		println "Cooking '${name}', '${pathToDir}' ..."
 		
