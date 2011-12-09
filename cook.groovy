@@ -13,7 +13,8 @@ class RepoCook {
 	
 	def rabbitmq
 	def aws
-	
+	def dropbox
+
 	def version = 1.0
 	
 	public String toString() {
@@ -24,8 +25,8 @@ class RepoCook {
 		"aws.domain = ${aws.domain}"
 	}
 	
-	def routingKey = 'RepoCook'
-	def routingKeyBack = 'CookBack'
+	def routingKey
+	def routingKeyBack
 	
 	def connection
 	def channel
@@ -72,35 +73,42 @@ class RepoCook {
 		
 		def slurper = new JsonSlurper()
 		
-		while (true) {
-			println " [o] Receiving ..."
+		println " [o] Receiving ..."
 
-			def delivery = consumer.nextDelivery()
-			def message = new String(delivery.body)
-			println(" [x] Received '$message'")
+		def delivery = consumer.nextDelivery()
+		def message = new String(delivery.body)
+		println(" [x] Received '$message'")
 			
-			def msg = slurper.parseText(message)
+		def msg = slurper.parseText(message)
 			
-			if (msg.version && msg.version <= version) {
-				def result = null
+		if (msg.version && msg.version <= version) {
+			def result = null
 				
-				switch (msg?.type) {
-					case 'GIT':
-						result = cookGIT(msg.name, msg.url)
-					break;
-					case 'EMBED':
-						result = cookEMBED(msg.name, msg.url)
-					break;
-				}
+			switch (msg?.type) {
+
+				case 'EMBED':
+					result = cookEMBED(msg.name, msg.url)
+				break
 				
-				if (result) {
-					def json = new JsonBuilder()
-					json id: msg.id, pdf: result.pdf, epub: result.epub
+				case 'DROPBOX':
+					result = cookDROPBOX(msg.name, msg.url)
+				break
+
+				case 'GIT':
+					result = cookGIT(msg.name, msg.url)
+				break
+
+				default:
+					println "ignore ${msg?.type}"
+			}
+				
+			if (result) {
+				def json = new JsonBuilder()
+				json id: msg.id, pdf: result.pdf, epub: result.epub
 			
-					//Sending
-					channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
-					println(" [x] Sent '${json}'")
-				}
+				//Sending
+				channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
+				println(" [x] Sent '${json}'")
 			}
 		}
 	}
@@ -127,6 +135,7 @@ class RepoCook {
 	}
 	
 	def runCmd(cmd) {
+		println "run: ${cmd}"
 		def proc = cmd.execute()
 		proc.waitFor()
 		//println proc.in.text
@@ -143,7 +152,7 @@ class RepoCook {
 		def pathToContents = new File('contents.rst', pathToDir)
 		pathToContents.write(new URL(url).text, 'UTF-8')
 		
-		println "Cooking '${name}', '${pathToDir}' ..."
+		println "Cooking[EMBED] '${name}', '${pathToDir}' ..."
 		
 		runCmd("sphinx-cook cache/${name}")
 				
@@ -163,10 +172,35 @@ class RepoCook {
 			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
 		]
 	}
-	
-	def cookGIT(name, url) {
-		println "Cooking '${name}', '${url}' ..."
+
+	def cookDROPBOX(name, url) {
+		println "Cooking[DROPBOX] '${name}', '${url}' ..."
 		
+		runCmd("rm -rf cache/${name}")
+		runCmd("cp -R -f ${dropbox.location}/${url} cache/${name}")		
+		runCmd("sphinx-cook cache/${name}")
+		
+		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
+		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
+		
+		//println "pdf file: ${pathOfPdf}"
+		//println "epub file: ${pathOfEpub}"
+		
+		def object
+		
+		upload("${name}.pdf", pathOfPdf.bytes)
+		upload("${name}.epub", pathOfEpub.bytes)
+
+		[
+			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
+			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
+		]
+	}
+
+	def cookGIT(name, url) {
+		println "Cooking[GIT] '${name}', '${url}' ..."
+		
+		runCmd("rm -rf cache/${name}")
 		runCmd("git clone ${url} cache/${name}")		
 		runCmd("sphinx-cook cache/${name}")
 		
@@ -201,24 +235,22 @@ else if (confFile.exists()) {
 	config = new ConfigSlurper().parse(confFile.toURL())
 }
 
-def cook = new RepoCook()
-cook.rabbitmq = config.rabbitmq
-cook.aws = config.aws
-
+def cook = new RepoCook(
+	rabbitmq: config.rabbitmq,
+	aws: config.aws,
+	dropbox: config.dropbox,
+	routingKey: config.routing.key.main,
+	routingKeyBack: config.routing.key.back
+)
 //println cook
 
-try {
-	cook.connect2rabbitmq()
-	//cook.connect2aws()
-	
-	//println cook.bucket
-	//println cook.s3Service.listObjects(cook.bucket)
-	
-	cook.receive()
-	
-	// end
-	cook.disconnect2rabbitmq()
-}
-catch (ConnectException ex) {
-	println "Error: ${ex.message}"
+while (true) {
+	try {
+		cook.connect2rabbitmq()
+		cook.receive()
+		cook.disconnect2rabbitmq()
+	}
+	catch (ConnectException ex) {
+		println "Error: ${ex.message}"
+	}
 }
