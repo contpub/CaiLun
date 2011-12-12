@@ -143,16 +143,16 @@ class RepoCook {
 	
 	def cookEMBED(name, url) {
 		
-		println "Cooking[EMBED] '${name}', '${pathToDir}' ..."
+		println "Cooking[EMBED] '${name}', '${url}' ..."
 		
 		runCmd("rm -rf cache/${name}")
 
 		new File("cache/${name}").mkdirs()
-		new File('index.rst', "cache/${name}").write(new URL(url+'?index').text, 'UTF-8')
-		new File('contents.rst', "cache/${name}").write(new URL(url).text, 'UTF-8')
+		new File("cache/${name}/index.rst").write(new URL(url+'?index').text, 'UTF-8')
+		new File("cache/${name}/contents.rst").write(new URL(url).text, 'UTF-8')
 
 		runCmd("sphinx-cook cache/${name}")
-				
+
 		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
 		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
 		
