@@ -103,8 +103,18 @@ class RepoCook {
 			}
 				
 			if (result) {
+				def pathOfPdf = lookupFile("cache/${msg.name}/cook", ~/.*\.pdf/)
+				def pathOfEpub = lookupFile("cache/${msg.name}/cook", ~/.*\.epub/)
+
+				if (pathOfPdf) {
+					upload("${msg.name}.pdf", pathOfPdf.bytes, 'application/pdf')
+				}
+				if (pathOfEpub) {
+					upload("${msg.name}.epub", pathOfEpub.bytes, 'application/epub+zip')
+				}
+
 				def json = new JsonBuilder()
-				json id: msg.id, pdf: result.pdf, epub: result.epub
+				json id: msg.id
 			
 				//Sending
 				channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
@@ -113,8 +123,8 @@ class RepoCook {
 		}
 	}
 	
-	def upload(key, bytes) {
-		println "upload"
+	def upload(key, bytes, ctype) {
+		println "upload ${key}"
 		
 		// reconnect to aws for prevent timeout
 		connect2aws()
@@ -122,11 +132,12 @@ class RepoCook {
 		def object //S3Object
 		
 		object = new S3Object(key, bytes)
+		object.contentType = ctype
 		object = s3Service.putObject(bucket, object)
 	}
 	
 	def lookupFile(path, pattern) {
-		def result
+		def result = null
 		new File(path).eachFileMatch(pattern) {
 			f ->
 			result = f
@@ -153,21 +164,7 @@ class RepoCook {
 
 		runCmd("sphinx-cook cache/${name}")
 
-		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
-		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
-		
-		//println "pdf file: ${pathOfPdf}"
-		//println "epub file: ${pathOfEpub}"
-		
-		def object
-		
-		upload("${name}.pdf", pathOfPdf.bytes)
-		upload("${name}.epub", pathOfEpub.bytes)
-				
-		[
-			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
-			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
-		]
+		true
 	}
 
 	def cookDROPBOX(name, url) {
@@ -176,22 +173,8 @@ class RepoCook {
 		runCmd("rm -rf cache/${name}")
 		runCmd("cp -R -f ${dropbox.location}/${url} cache/${name}")		
 		runCmd("sphinx-cook cache/${name}")
-		
-		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
-		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
-		
-		//println "pdf file: ${pathOfPdf}"
-		//println "epub file: ${pathOfEpub}"
-		
-		def object
-		
-		upload("${name}.pdf", pathOfPdf.bytes)
-		upload("${name}.epub", pathOfEpub.bytes)
-
-		[
-			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
-			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
-		]
+	
+		true
 	}
 
 	def cookGIT(name, url) {
@@ -200,22 +183,8 @@ class RepoCook {
 		runCmd("rm -rf cache/${name}")
 		runCmd("git clone ${url} cache/${name}")		
 		runCmd("sphinx-cook cache/${name}")
-		
-		def pathOfPdf = lookupFile("cache/${name}/cook", ~/.*\.pdf/)
-		def pathOfEpub = lookupFile("cache/${name}/cook", ~/.*\.epub/)
-		
-		//println "pdf file: ${pathOfPdf}"
-		//println "epub file: ${pathOfEpub}"
-		
-		def object
-		
-		upload("${name}.pdf", pathOfPdf.bytes)
-		upload("${name}.epub", pathOfEpub.bytes)
-
-		[
-			pdf: "http://contpub.s3.amazonaws.com/${name}.pdf",
-			epub: "http://contpub.s3.amazonaws.com/${name}.epub"
-		]
+	
+		true
 	}
 }
 
