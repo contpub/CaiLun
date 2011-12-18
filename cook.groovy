@@ -81,9 +81,10 @@ class RepoCook {
 			
 		def msg = slurper.parseText(message)
 			
-		if (msg.version && msg.version <= version) {
+		if (msg.id && msg.version && msg.version <= version) {
 			def result = null
-				
+			def pathPrefix = ''
+
 			switch (msg?.type) {
 
 				case 'EMBED':
@@ -98,6 +99,11 @@ class RepoCook {
 					result = cookGIT(msg.name, msg.url)
 				break
 
+				case 'SANDBOX':
+					result = cookEMBED(msg.name, msg.url)
+					pathPrefix = 'sandbox/'
+				break
+
 				default:
 					println "ignore ${msg?.type}"
 			}
@@ -107,14 +113,14 @@ class RepoCook {
 				def pathOfEpub = lookupFile("cache/${msg.name}/cook", ~/.*\.epub/)
 
 				if (pathOfPdf) {
-					upload("${msg.name}.pdf", pathOfPdf.bytes, 'application/pdf')
+					upload("${pathPrefix}${msg.name}.pdf", pathOfPdf.bytes, 'application/pdf')
 				}
 				if (pathOfEpub) {
-					upload("${msg.name}.epub", pathOfEpub.bytes, 'application/epub+zip')
+					upload("${pathPrefix}${msg.name}.epub", pathOfEpub.bytes, 'application/epub+zip')
 				}
 
 				def json = new JsonBuilder()
-				json id: msg.id
+				json id: msg.id, type: msg.type
 			
 				//Sending
 				channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
