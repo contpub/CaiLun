@@ -83,7 +83,7 @@ class RepoCook {
 			
 		if (msg.id && msg.version && msg.version <= version) {
 			def result = null
-			def pathPrefix = ''
+			def pathPrefix = 'book/'
 
 			switch (msg?.type) {
 
@@ -111,12 +111,16 @@ class RepoCook {
 			if (result) {
 				def pathOfPdf = lookupFile("cache/${msg.name}/cook", ~/.*\.pdf/)
 				def pathOfEpub = lookupFile("cache/${msg.name}/cook", ~/.*\.epub/)
+				def pathOfMobi = lookupFile("cache/${msg.name}/cook", ~/.*\.mobi/)
 
 				if (pathOfPdf) {
 					upload("${pathPrefix}${msg.name}.pdf", pathOfPdf.bytes, 'application/pdf')
 				}
 				if (pathOfEpub) {
 					upload("${pathPrefix}${msg.name}.epub", pathOfEpub.bytes, 'application/epub+zip')
+				}
+				if (pathOfMobi) {
+					upload("${pathPrefix}${msg.name}.mobi", pathOfMobi.bytes, 'application/x-mobipocket-ebook')
 				}
 
 				def json = new JsonBuilder()
@@ -146,7 +150,9 @@ class RepoCook {
 		def result = null
 		new File(path).eachFileMatch(pattern) {
 			f ->
-			result = f
+			if (f.name != 'cover.pdf') {
+				result = f
+			}
 		}
 		result
 	}
@@ -196,8 +202,8 @@ class RepoCook {
 
 // 讀入外部設定檔
 def config
-def confFile = new File('cook.properties')
-def confSecureFile = new File('cook-secure.properties')
+def confFile = new File('config.groovy')
+def confSecureFile = new File('config-secure.groovy')
 
 // Use secure configuration instead.
 if (confSecureFile.exists()) {
