@@ -112,6 +112,8 @@ class RepoCook {
 				def pathOfPdf = lookupFile("cache/${msg.name}/cook", ~/.*\.pdf/)
 				def pathOfEpub = lookupFile("cache/${msg.name}/cook", ~/.*\.epub/)
 				def pathOfMobi = lookupFile("cache/${msg.name}/cook", ~/.*\.mobi/)
+				def pathOfHtml = lookupFile("cache/${msg.name}/cook", ~/.*\.zip/)
+				def pathOfLog = lookupFile("cache/${msg.name}/cook", ~/.*\.log/)
 
 				if (pathOfPdf) {
 					upload("${pathPrefix}${msg.name}.pdf", pathOfPdf.bytes, 'application/pdf')
@@ -121,6 +123,12 @@ class RepoCook {
 				}
 				if (pathOfMobi) {
 					upload("${pathPrefix}${msg.name}.mobi", pathOfMobi.bytes, 'application/x-mobipocket-ebook')
+				}
+				if (pathOfHtml) {
+					upload("${pathPrefix}${msg.name}.zip", pathOfHtml.bytes, 'application/zip')
+				}
+				if (pathOfLog) {
+					upload("${pathPrefix}${msg.name}.log", pathOfLog.bytes, 'text/plain')
 				}
 
 				def json = new JsonBuilder()
