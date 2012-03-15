@@ -1,13 +1,17 @@
 #!/usr/bin/groovy
 @Grab('com.rabbitmq:amqp-client:2.6.1')
 @Grab('net.java.dev.jets3t:jets3t:0.8.1')
+@Grab('commons-io:commons-io:2.1')
 
 import groovy.json.*
 import com.rabbitmq.client.*
 import org.jets3t.service.*
+import org.jets3t.service.acl.*
+import org.jets3t.service.utils.Mimetypes
 import org.jets3t.service.model.S3Object
 import org.jets3t.service.security.AWSCredentials
 import org.jets3t.service.impl.rest.httpclient.RestS3Service
+import org.apache.commons.io.*
 
 class RepoCook {
 	
@@ -115,6 +119,16 @@ class RepoCook {
 				def pathOfHtml = lookupFile("cache/${msg.name}/cook", ~/.*\.zip/)
 				def pathOfLog = lookupFile("cache/${msg.name}/cook", ~/.*\.log/)
 
+				//upload zip first for author preview
+				if (pathOfHtml) {
+					upload("${pathPrefix}${msg.name}.zip", pathOfHtml.bytes, 'application/zip')
+				}
+				//call url
+				if (msg.vhost) {
+					def response = new URL(msg.vhost).text
+					println response
+				}
+
 				if (pathOfPdf) {
 					upload("${pathPrefix}${msg.name}.pdf", pathOfPdf.bytes, 'application/pdf')
 				}
@@ -124,25 +138,27 @@ class RepoCook {
 				if (pathOfMobi) {
 					upload("${pathPrefix}${msg.name}.mobi", pathOfMobi.bytes, 'application/x-mobipocket-ebook')
 				}
-				if (pathOfHtml) {
-					upload("${pathPrefix}${msg.name}.zip", pathOfHtml.bytes, 'application/zip')
-				}
+				// Tell the server job done
+				def json = new JsonBuilder()
+				json id: msg.id, type: msg.type
+				// Sending
+				channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
+				println(" [x] Sent '${json}'")
+
 				if (pathOfLog) {
 					upload("${pathPrefix}${msg.name}.log", pathOfLog.bytes, 'text/plain')
 				}
 
-				def json = new JsonBuilder()
-				json id: msg.id, type: msg.type
-			
-				//Sending
-				channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
-				println(" [x] Sent '${json}'")
+				// Extract zip to public dir
+				if (pathOfHtml) {
+					extract("${msg.name}", pathOfHtml)
+				}
 			}
 		}
 	}
 	
-	def upload(key, bytes, ctype) {
-		println "upload ${key}"
+	def upload(key, bytes, ctype, isPublic = false) {
+		println "upload ${key} ${ctype}"
 		
 		// reconnect to aws for prevent timeout
 		connect2aws()
@@ -151,9 +167,29 @@ class RepoCook {
 		
 		object = new S3Object(key, bytes)
 		object.contentType = ctype
+
+		if (isPublic) {
+			def bucketAcl = s3Service.getBucketAcl(bucket)
+			bucketAcl.grantPermission(GroupGrantee.ALL_USERS, Permission.PERMISSION_READ);
+			object.setAcl(bucketAcl)
+		}
+
 		object = s3Service.putObject(bucket, object)
 	}
 	
+	def getContentType(filename) {
+		Mimetypes.instance.getMimetype(filename)
+	}
+
+	def extract(prefix, file) {
+		println "extract ${file.name} to ${prefix}"
+		def zipFile = new java.util.zip.ZipFile(file)
+		zipFile.entries().findAll { !it.directory }.each {
+			//println zipFile.getInputStream(it)
+			upload("public/${prefix}/${it.name}", IOUtils.toByteArray(zipFile.getInputStream(it)), getContentType(it.name), true)
+		}
+	}
+
 	def lookupFile(path, pattern) {
 		def result = null
 		new File(path).eachFileMatch(pattern) {
@@ -202,7 +238,7 @@ class RepoCook {
 		
 		runCmd("rm -rf cache/${name}")
 		runCmd("git clone ${url} cache/${name}")		
-		runCmd("sphinx-cook cache/${name}")
+		runCmd("sphinx-cook -f cover,pdf,epub,mobi,html cache/${name}")
 	
 		true
 	}
