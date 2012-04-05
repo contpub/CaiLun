@@ -7,6 +7,10 @@ Install & configuration
 2. Copy cook.properties to cook-secure.properties
 3. Modify cook-secure.properties with correct passwords/settings
 
+Install groovy
+
+...
+
 Install sphinx
 
 https://bitbucket.org/lyhcode/sphinx

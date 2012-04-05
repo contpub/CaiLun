@@ -1,6 +1,6 @@
 #!/usr/bin/groovy
 @GrabConfig(systemClassLoader=true)  
-@Grab('com.rabbitmq:amqp-client:2.6.1')
+@Grab('com.rabbitmq:amqp-client:2.8.1')
 @Grab('net.java.dev.jets3t:jets3t:0.8.1')
 @Grab('commons-io:commons-io:2.1')
 @Grab('org.eclipse.jgit:org.eclipse.jgit:1.3.0.201202151440-r')
@@ -67,7 +67,7 @@ class PublishingWorker {
 		channel = connection.createChannel()
 		
 		channel.queueDeclare(routingKey, false, false, false, null)
-		channel.queueDeclare(routingKeyBack, false, false, false, null)
+		//channel.queueDeclare(routingKeyBack, false, false, false, null)
 	}
 
 	/**
@@ -168,7 +168,6 @@ class PublishingWorker {
 				def json = new JsonBuilder()
 				json id: msg.id, type: msg.type
 				// Sending
-				channel.basicPublish('', routingKeyBack, null, json?.toString().bytes)
 				println(" [x] Sent '${json}'")
 
 				if (pathOfLog) {
@@ -387,7 +386,7 @@ while (true) {
 		cook.receive()
 		cook.disconnect2rabbitmq()
 	}
-	catch (ConnectException ex) {
-		println "Error: ${ex.message}"
+	catch (e) {
+		e.printStackTrace()
 	}
 }
