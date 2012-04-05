@@ -7,14 +7,23 @@ Install & configuration
 2. Copy cook.properties to cook-secure.properties
 3. Modify cook-secure.properties with correct passwords/settings
 
-Post-configuration
+Install sphinx
 
-1. sudo easy_install -U Sphinx
-2. patch Sphinx (gist)
-3. sudo easy_install Pygments
-4. hg clone https://bitbucket.org/birkenfeld/pygments-main
-5. cd pygments-main
-6. sudo easy_install .
+https://bitbucket.org/lyhcode/sphinx
+
+Install sphinx-cook
+
+https://github.com/contpub/sphinx-cook
+
+Install fonts
+
+...
+
+Install pygments
+
+1. hg clone https://bitbucket.org/birkenfeld/pygments-main
+2. cd pygments-main
+3. sudo easy_install .
 
 Execute
 

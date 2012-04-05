@@ -1,19 +1,36 @@
 #!/usr/bin/groovy
+@GrabConfig(systemClassLoader=true)  
 @Grab('com.rabbitmq:amqp-client:2.6.1')
 @Grab('net.java.dev.jets3t:jets3t:0.8.1')
 @Grab('commons-io:commons-io:2.1')
+@Grab('org.eclipse.jgit:org.eclipse.jgit:1.3.0.201202151440-r')
+@Grab('org.tmatesoft.svnkit:svnkit:1.3.5')
+@Grab('org.tmatesoft.svnkit:svnkit-javahl:1.3.5')
 
 import groovy.json.*
+
+import org.apache.commons.io.*
+
 import com.rabbitmq.client.*
+
 import org.jets3t.service.*
 import org.jets3t.service.acl.*
 import org.jets3t.service.utils.Mimetypes
 import org.jets3t.service.model.S3Object
 import org.jets3t.service.security.AWSCredentials
 import org.jets3t.service.impl.rest.httpclient.RestS3Service
-import org.apache.commons.io.*
 
-class RepoCook {
+import org.eclipse.jgit.api.*
+import org.eclipse.jgit.transport.*
+import org.eclipse.jgit.storage.file.*
+
+import org.tmatesoft.svn.core.*
+import org.tmatesoft.svn.core.wc.*
+import org.tmatesoft.svn.core.internal.io.*
+import org.tmatesoft.svn.core.internal.io.dav.*
+import org.tmatesoft.svn.core.internal.io.svn.*
+
+class PublishingWorker {
 	
 	def rabbitmq
 	def aws
@@ -102,6 +119,10 @@ class RepoCook {
 				case 'GIT':
 					result = cookGIT(msg.name, msg.url)
 				break
+				
+				case 'SVN':
+					result = cookSVN(msg.name, msg.url)
+				break
 
 				case 'SANDBOX':
 					result = cookEMBED(msg.name, msg.url)
@@ -113,11 +134,11 @@ class RepoCook {
 			}
 				
 			if (result) {
-				def pathOfPdf = lookupFile("cache/${msg.name}/cook", ~/.*\.pdf/)
-				def pathOfEpub = lookupFile("cache/${msg.name}/cook", ~/.*\.epub/)
-				def pathOfMobi = lookupFile("cache/${msg.name}/cook", ~/.*\.mobi/)
-				def pathOfHtml = lookupFile("cache/${msg.name}/cook", ~/.*\.zip/)
-				def pathOfLog = lookupFile("cache/${msg.name}/cook", ~/.*\.log/)
+				def pathOfPdf = lookupFile("cache/cook/${msg.name}/cook", ~/.*\.pdf/)
+				def pathOfEpub = lookupFile("cache/cook/${msg.name}/cook", ~/.*\.epub/)
+				def pathOfMobi = lookupFile("cache/cook/${msg.name}/cook", ~/.*\.mobi/)
+				def pathOfHtml = lookupFile("cache/cook/${msg.name}/cook", ~/.*\.zip/)
+				def pathOfLog = lookupFile("cache/cook/${msg.name}/cook", ~/.*\.log/)
 
 				//upload zip first for author preview
 				if (pathOfHtml) {
@@ -125,8 +146,13 @@ class RepoCook {
 				}
 				//call url
 				if (msg.vhost) {
-					def response = new URL(msg.vhost).text
-					println response
+					try {
+						def response = new URL(msg.vhost).text
+						println response
+					}
+					catch (ex) {
+						println "generate vhost for ${msg.vhost} error"
+					}
 				}
 
 				if (pathOfPdf) {
@@ -211,24 +237,75 @@ class RepoCook {
 	def cookEMBED(name, url) {
 		
 		println "Cooking[EMBED] '${name}', '${url}' ..."
-		
-		runCmd("rm -rf cache/${name}")
-
-		new File("cache/${name}").mkdirs()
-		new File("cache/${name}/index.rst").write(new URL(url+'?index').text, 'UTF-8')
-		new File("cache/${name}/contents.rst").write(new URL(url).text, 'UTF-8')
-
-		runCmd("sphinx-cook cache/${name}")
-
+	
+		try {
+			runCmd("rm -rf cache/cook/${name}")
+	
+			new File("cache/cook/${name}").mkdirs()
+			new File("cache/cook/${name}/index.rst").write(new URL(url+'?index').text, 'UTF-8')
+			new File("cache/cook/${name}/contents.rst").write(new URL(url).text, 'UTF-8')
+	
+			runCmd("sphinx-cook cache/cook/${name}")
+		}
+		catch (e) {
+			e.printStackTrace()
+			return false
+		}
 		true
 	}
 
 	def cookDROPBOX(name, url) {
 		println "Cooking[DROPBOX] '${name}', '${url}' ..."
 		
-		runCmd("rm -rf cache/${name}")
-		runCmd("cp -R -f ${dropbox.location}/${url} cache/${name}")		
-		runCmd("sphinx-cook cache/${name}")
+		runCmd("rm -rf cache/cook/${name}")
+		runCmd("cp -R -f ${dropbox.location}/${url} cache/cook/${name}")		
+		runCmd("sphinx-cook cache/cook/${name}")
+	
+		true
+	}
+
+	def cookSVN(name, url) {
+		println "Cooking[SVN] '${name}', '${url}' ..."
+		
+		if (url==null || url=='' || url=='null') {
+			println "invalid url ${url}"
+			return false
+		}
+
+		def ant = new AntBuilder()
+		
+		def repodir = new File("cache/svn/${name}")
+		def cookdir = new File("cache/cook/${name}")
+
+		def client = new SVNUpdateClient(SVNWCUtil.createDefaultAuthenticationManager("guest", "guest"), SVNWCUtil.createDefaultOptions(true))
+
+		if (repodir.exists()) {
+			if (new File(repodir, '.svn').exists()) {
+				// SVN update
+				client.doUpdate(repodir, SVNRevision.HEAD, true)
+			}
+			else {
+				ant.delete(dir: repodir, failonerror: false)
+			}
+		}
+
+		if (!repodir.exists()) {
+			// SVN Checkout
+			repodir.mkdirs()
+			client.doCheckout(SVNURL.parseURIDecoded(url) , repodir, SVNRevision.HEAD, SVNRevision.HEAD, SVNDepth.INFINITY, true)
+		}
+		
+		if (cookdir.exists()) {
+			ant.delete(dir: cookdir, failonerror: false)
+		}
+		if (!cookdir.exists()) {
+			cookdir.mkdirs()
+		}
+		ant.copy(todir: cookdir) {
+			fileset(dir: repodir)
+		}
+
+		runCmd("sphinx-cook -f cover,pdf,epub,mobi,html cache/cook/${name}")
 	
 		true
 	}
@@ -236,9 +313,44 @@ class RepoCook {
 	def cookGIT(name, url) {
 		println "Cooking[GIT] '${name}', '${url}' ..."
 		
-		runCmd("rm -rf cache/${name}")
-		runCmd("git clone ${url} cache/${name}")		
-		runCmd("sphinx-cook -f cover,pdf,epub,mobi,html cache/${name}")
+		if (url==null || url=='' || url=='null') {
+			println "invalid url ${url}"
+			return false
+		}
+
+		def ant = new AntBuilder()
+		
+		def repodir = new File("cache/git/${name}")
+		def cookdir = new File("cache/cook/${name}")
+
+		if (repodir.exists()) {
+			if (new File(repodir, '.git').exists()) {
+				// Git Pull first
+				new PullCommand(Git.open(repodir).repository).call()
+			}
+			else {
+				ant.delete(dir: repodir, failonerror: false)
+			}
+		}
+
+		if (!repodir.exists()) {
+			// Git Clone
+			repodir.mkdirs()
+			//def provider = new UsernamePasswordCredentialsProvider("user@mail", "password")
+			//new CloneCommand().setURI(url).setDirectory(repodir).setCredentialsProvider(provider).call()
+			new CloneCommand().setURI(url).setDirectory(repodir).call()
+		}
+		
+		if (cookdir.exists()) {
+			ant.delete(dir: cookdir, failonerror: false)
+		}
+		if (!cookdir.exists()) {
+			cookdir.mkdirs()
+		}
+		ant.copy(todir: cookdir) {
+			fileset(dir: repodir)
+		}
+		runCmd("sphinx-cook -f cover,pdf,epub,mobi,html cache/cook/${name}")
 	
 		true
 	}
@@ -257,7 +369,7 @@ else if (confFile.exists()) {
 	config = new ConfigSlurper().parse(confFile.toURL())
 }
 
-def cook = new RepoCook(
+def cook = new PublishingWorker(
 	rabbitmq: config.rabbitmq,
 	aws: config.aws,
 	dropbox: config.dropbox,
@@ -265,6 +377,9 @@ def cook = new RepoCook(
 	routingKeyBack: config.routing.key.back
 )
 //println cook
+
+DAVRepositoryFactory.setup()
+SVNRepositoryFactoryImpl.setup()
 
 while (true) {
 	try {
