@@ -65,4 +65,10 @@ cp config.groovy config-secure.groovy
 # modify config-secure.groovy
 ```
 
+### fix can't write on file `xxxxx.pdf'
 
+```
+sudo dd if=/dev/zero of=/var/512mb.swap bs=1M count=512
+sudo mkswap /var/512mb.swap 
+sudo swapon /var/512mb.swap 
+```
