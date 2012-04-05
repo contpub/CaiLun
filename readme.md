@@ -45,6 +45,15 @@ s3cmd sync s3://s3.contpub.org/fonts/ fonts
 sudo cp -rf fonts /usr/share/fonts/contpub
 fc-cache
 
+# ImageMagick
+sudo apt-get install imagemagick
+
+# KindleGen
+wget http://s3.amazonaws.com/kindlegen/kindlegen_linux_2.6_i386_v2_4.tar.gz
+mkdir kindlegen
+tar zxvf ../kindlegen_linux_2.6_i386_v2_4.tar.gz
+sudo mv kindlegen /usr/local/bin
+
 # sphinx-cook
 git clone git@github.com:contpub/sphinx-cook.git
 sudo ln -sf ~/sphinx-cook/bin/sphinx-cook /usr/local/bin/sphinx-cook
@@ -54,7 +63,6 @@ git clone git@github.com:contpub/CaiLun.git
 cd CaoLun
 cp config.groovy config-secure.groovy
 # modify config-secure.groovy
-
 ```
 
 
