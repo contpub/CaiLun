@@ -1,35 +1,60 @@
 CaiLun: Distributed repo cook for SimaQian
 ===========================================
 
-Install & configuration
+### Installation
 
-1. Install RabbitMQ
-2. Copy cook.properties to cook-secure.properties
-3. Modify cook-secure.properties with correct passwords/settings
+```
+# TeX Live
+sudo apt-get install texlive-full
 
-Install groovy
+# apt-add-repository
+sudo apt-get install python-software-properties
+sudo apt-add-repository ppa:groovy-dev/groovy
+sudo apt-get update
 
-...
+# groovy
+sudo apt-get install groovy
 
-Install sphinx
+# python-pip
+sudo apt-get install python-pip
 
-https://bitbucket.org/lyhcode/sphinx
+# git
+sudo apt-get install git-core
 
-Install sphinx-cook
+# docutils
+sudo apt-get install python-docutils
 
-https://github.com/contpub/sphinx-cook
+# mercurial
+sudo apt-get install mercurial
 
-Install fonts
+# sphinx (contpub branch)
+hg clone https://bitbucket.org/lyhcode/sphinx
+cd sphinx
+sudo easy_install .
 
-...
+# pygments
+hg clone https://bitbucket.org/birkenfeld/pygments-main
+cd pygments-main
+sudo easy_install .
 
-Install pygments
+# s3cmd
+sudo apt-get install s3cmd
 
-1. hg clone https://bitbucket.org/birkenfeld/pygments-main
-2. cd pygments-main
-3. sudo easy_install .
+# download fonts
+s3cmd sync s3://s3.contpub.org/fonts/ fonts
+sudo cp -rf fonts /usr/share/fonts/contpub
+fc-cache
 
-Execute
+# sphinx-cook
+git clone git@github.com:contpub/sphinx-cook.git
+sudo ln -sf ~/sphinx-cook/bin/sphinx-cook /usr/local/bin/sphinx-cook
 
-1. ./cook.groovy
+# CaiLun
+git clone git@github.com:contpub/CaiLun.git
+cd CaoLun
+cp config.groovy config-secure.groovy
+# modify config-secure.groovy
+
+```
+
 
