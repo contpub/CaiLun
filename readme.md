@@ -54,6 +54,9 @@ mkdir kindlegen
 tar zxvf ../kindlegen_linux_2.6_i386_v2_4.tar.gz
 sudo mv kindlegen /usr/local/bin
 
+# pdftk
+sudo apt-get install pdftk
+
 # sphinx-cook
 git clone git@github.com:contpub/sphinx-cook.git
 sudo ln -sf ~/sphinx-cook/bin/sphinx-cook /usr/local/bin/sphinx-cook
