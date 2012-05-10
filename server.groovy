@@ -175,9 +175,9 @@ class PublishingWorker {
 				}
 
 				// Extract zip to public dir
-				if (pathOfHtml) {
+				/*if (pathOfHtml) {
 					extract("${msg.name}", pathOfHtml)
-				}
+				}*/
 			}
 		}
 	}
@@ -257,9 +257,9 @@ class PublishingWorker {
 		println "Cooking[DROPBOX] '${name}', '${url}' ..."
 		
 		runCmd("rm -rf cache/cook/${name}")
-		runCmd("cp -R -f ${dropbox.location}/${url} cache/cook/${name}")		
-		runCmd("sphinx-cook cache/cook/${name}")
-	
+		runCmd("cp -R -f ${dropbox.location}/contpub-${name} cache/cook/${name}")		
+		runCmd("sphinx-cook -f cover,pdf,epub,mobi,html cache/cook/${name}")
+		
 		true
 	}
 
