@@ -19,7 +19,8 @@ sudo apt-get install groovy
 sudo apt-get install python-pip
 
 # git
-sudo apt-get install git-core
+# sudo apt-get install git-core
+sudo apt-get install git
 
 # docutils
 sudo apt-get install python-docutils
@@ -33,9 +34,10 @@ cd sphinx
 sudo easy_install .
 
 # pygments
-hg clone https://bitbucket.org/birkenfeld/pygments-main
-cd pygments-main
-sudo easy_install .
+# hg clone https://bitbucket.org/birkenfeld/pygments-main
+# cd pygments-main
+# sudo easy_install .
+sudo apt-get install python-pygments
 
 # s3cmd
 sudo apt-get install s3cmd
