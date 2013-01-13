@@ -52,7 +52,8 @@ sudo apt-get install imagemagick
 
 # KindleGen
 wget http://s3.amazonaws.com/kindlegen/kindlegen_linux_2.6_i386_v2_7.tar.gz
-mkdir kindlegen
+mkdir -p kindlegen
+cd kindlegen
 tar zxvf ../kindlegen_linux_2.6_i386_v2_4.tar.gz
 sudo mv kindlegen /usr/local/bin
 
